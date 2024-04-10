@@ -11,4 +11,4 @@ Code for analysis and visualization is avaiable as [Rscripts](Rscripts)
 * H&E staining: the staining images related to the raw data are avaiable at [Staining](Staining)
 
 ## Citation
-Zhang *et al*. (2023) Spatiotemporal transcriptome atlas of the developing human retina.
+Zhang *et al*. (2024) Spatiotemporal transcriptome atlas of the developing human retina.

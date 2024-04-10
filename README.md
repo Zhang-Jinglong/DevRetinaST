@@ -1,4 +1,4 @@
-# Spatiotemporal transcriptome of the developing human retina
+# Spatiotemporal transcriptome atlas of the developing human retina
 Code and data related to our manuscript "Spatiotemporal transcriptome atlas of the developing human retina".
 
 ![Fig. 1 - Overview](overview.png)

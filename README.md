@@ -13,6 +13,8 @@ Code and data related to our manuscript "Spatiotemporal transcriptome atlas of t
 * COMMOT 0.0.3
 * CellPhoneDB 4.0.0
 * SPARK 1.1.1
+* SCRIPro 1.1.30
+* SpaceRanger 2.1.1
 
 ## Code
 Code for analysis and visualization is avaiable as [Rscripts](Rscripts).

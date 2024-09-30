@@ -1,5 +1,5 @@
-# Spatiotemporal transcriptome atlas of the developing human retina
-Code and data related to our manuscript "Spatiotemporal transcriptome atlas of the developing human retina".
+# Spatiotemporally resolved transcriptomics reveals the cellular dynamics of human retinal development
+Code and data related to our manuscript "Spatiotemporally resolved transcriptomics reveals the cellular dynamics of human retinal development".
 
 ![Figure 1 - Overview](overview.png)
 
@@ -26,4 +26,4 @@ Anyone can reproduce results in the manuscript in order based on the file prefix
 * H&E staining: the staining images related to the raw data are avaiable at [Staining](Staining).
 
 ## Citation
-Zhang *et al*. (2024) Spatiotemporal transcriptome atlas of the developing human retina.
+Zhang *et al*. (2024) Spatiotemporally resolved transcriptomics reveals the cellular dynamics of human retinal development.

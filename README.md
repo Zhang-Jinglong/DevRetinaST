@@ -1,7 +1,7 @@
 # Spatiotemporal transcriptome atlas of the developing human retina
 Code and data related to our manuscript "Spatiotemporal transcriptome atlas of the developing human retina".
 
-![Fig. 1 - Overview](overview.png)
+![Figure 1 - Overview](overview.png)
 
 ## Main software requirements
 * R 4.3.1

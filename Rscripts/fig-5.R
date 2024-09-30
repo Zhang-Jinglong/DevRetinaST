@@ -7,6 +7,8 @@ library(GeneOverlap)
 library(ggpubr)
 library(ggforce)
 library(ggnewscale)
+library(grid)
+library(viridis)
 
 rm(list = ls())
 source("scripts/utils.R")
@@ -17,12 +19,8 @@ load("outputs/Disease/retnet.RData")
 load("outputs/Disease/kegg_go_gene.RData")
 load("outputs/DEG/domain_deg.RData")
 load("outputs/Development/reg_gene_df.RData")
-load("outputs/ImageProcessing/coordinate.RData")
+load("outputs/ImageProcessing/coordinate_HE.RData")
 load("outputs/QualityControl/retina_st_qc.RData")
-
-spot.list <- Cells(retina.st.domain)
-retina.st.domain$coord.x <- spatial.coord.new[spot.list, "coord.x"]
-retina.st.domain$coord.y <- spatial.coord.new[spot.list, "coord.y"]
 
 retina.st.domain$domain <- factor(
   domain.list[as.character(retina.st.domain$domain)], levels = domain.list
@@ -100,12 +98,12 @@ exp.mat <- retina.st.qc@assays$Spatial@data
 term.list <- list()
 for (set.i in 1:length(key.gene.set)) {
   df.i <- data.frame(
-    exp = scale(colMeans(exp.mat[key.gene.set[[set.i]], ])),
+    exp = scale(colMeans(exp.mat[key.gene.set[[set.i]],])),
     set = names(key.gene.set)[set.i],
     group = retina.st.qc$is.retina
   )
   term.list[[names(key.gene.set)[set.i]]] <- df.i
-  
+
   print(wilcox.test(
     x = df.i[df.i$group == "Retina", "exp"],
     y = df.i[df.i$group == "Non retina", "exp"],
@@ -130,12 +128,14 @@ pic.c <- ggplot(
   scale_fill_manual(values = c(
     `Retina` = "#A6D854", `Non retina` = "#FFD92F"
   )) +
-  theme_bw() + labs(fill = "Tissue") +
+  theme_bw() +
+  labs(fill = "Tissue") +
   theme(
     axis.title.x = element_blank(),
     axis.text = element_text(color = "black"),
     axis.text.x = element_text(angle = 45, hjust = 1)
-  ) + ylab("Normalized avg. expr.")
+  ) +
+  ylab("Normalized avg. expr.")
 
 ## Gene set expression changes ####
 exp.mat <- retina.st.domain@assays$Spatial@data
@@ -143,7 +143,7 @@ exp.mat <- retina.st.domain@assays$Spatial@data
 term.list <- list()
 for (set.i in 1:length(key.gene.set)) {
   df.i <- data.frame(
-    exp = scale(colMeans(exp.mat[key.gene.set[[set.i]], ])),
+    exp = scale(colMeans(exp.mat[key.gene.set[[set.i]],])),
     set = names(key.gene.set)[set.i],
     sample = retina.st.domain$sample.name
   )
@@ -166,7 +166,9 @@ pic.d <- ggplot(
     axis.text = element_text(color = "black"),
     axis.text.x = element_text(angle = 45, hjust = 1),
     panel.grid.minor = element_blank()
-  ) + ylab("Normalized avg. expr.") + labs(color = "Gene set") 
+  ) +
+  ylab("Normalized avg. expr.") +
+  labs(color = "Gene set")
 
 pic.c | pic.d
 ggsave(
@@ -174,46 +176,65 @@ ggsave(
   width = 7, height = 4
 )
 
-# VAM spatial expression (Fig. 5e)  ####
-plot.data <- data.frame(
-  value = colMeans(retina.st.domain@assays$Spatial@data[key.gene.set$VAM, ]),
-  x = (
-    retina.st.domain$coord.x +
-      coord.add.2[retina.st.domain$sample.name, "x"]
-  ),
-  y = (
-    retina.st.domain$coord.y +
-      coord.add.2[retina.st.domain$sample.name, "y"]
-  )
-)
-plot.data$value <- scale(plot.data$value)
-plot.data$value[plot.data$value > 3] <- 3
-plot.data$value[plot.data$value < -3] <- -3
+# VAM spatial expression (Fig. 5e) ####
+max.y <- dim(img.list[[1]])[1]
+start.x <- 0
+for (i in 2:length(img.list)) {
+  start.x <- c(start.x, start.x[i - 1] + dim(img.list[[i - 1]])[2] + 150)
+  coo.list[[i]]$coord.x <- coo.list[[i]]$coord.x + start.x[i]
+  if (max.y < dim(img.list[[i]])[1]) {
+    max.y <- dim(img.list[[i]])[1]
+  }
+}
+start.y <- NULL
+for (i in seq_along(coo.list)) {
+  start.y <- c(start.y, ceiling((max.y - dim(img.list[[i]])[1]) / 2))
+  coo.list[[i]]$coord.y <- coo.list[[i]]$coord.y + start.y[i]
+}
+coo <- do.call("rbind", coo.list)
+rownames(coo) <- sub("^[^.]*\\.", "", rownames(coo))
+coo$exp <- colMeans(retina.st.domain@assays$Spatial@data[key.gene.set$VAM, rownames(coo)])
+coo$exp[coo$exp > quantile(coo$exp, 0.95)] <- quantile(coo$exp, 0.95)
 
-pic.e <- ggplot()
-for (sample.i in sample.list) {
-  pic.e <- create.empty.bk(
-    pic.e, coord.add.2[sample.i, "x"], coord.add.2[sample.i, "y"]
-  )
+pic <- ggplot()
+for (i in seq_along(img.list)) {
+  img.i <- img.list[[i]]
+  pic <- pic +
+    annotation_custom(
+      rasterGrob(
+        img.i,
+        width = unit(1, "npc"),
+        height = unit(1, "npc")
+      ),
+      xmin = start.x[i], xmax = start.x[i] + dim(img.i)[2],
+      ymin = start.y[i], ymax = start.y[i] + dim(img.i)[1]
+    )
 }
 
-pic.e +
+pic +
   geom_point(
-    data = plot.data, size = 0.4,
-    mapping = aes(x = x, y = y, color = value)
+    data = coo,
+    aes(x = coord.x, y = coord.y, fill = exp),
+    size = 0.9, shape = 21, stroke = 0.1, color = "white"
   ) +
-  scale_color_gradient2(low = "#5D94A4", mid = "#FFFFFF", high = "#DA3B46") +
+  scale_fill_viridis("VAM", option = "B") +
+  coord_fixed(
+    xlim = c(0, start.x[6] + dim(img.list[[6]])[2]),
+    ylim = c(0, max.y), expand = FALSE
+  ) +
   theme_bw() +
   theme(
+    axis.text = element_blank(),
     axis.ticks = element_blank(),
     axis.title = element_blank(),
-    axis.text = element_blank(),
     panel.grid = element_blank(),
-    panel.border = element_blank()
-  ) +
-  coord_fixed()
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    panel.spacing = element_blank(),
+    legend.position = "bottom"
+  )
 
 ggsave(
   "outputs/Visualization/fig-5e.pdf",
-  width = 6, height = 5
+  width = 10, height = 5
 )

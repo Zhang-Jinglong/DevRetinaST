@@ -74,83 +74,7 @@ pheatmap(
   width = 9.5, height = 6
 )
 
-# Pseudo cell type proportion change curve (Fig. 2b) ####
-type.curve.change <- list()
-for (sample.i in sample.list) {
-  type.curve <- list(
-    sample = c(), cell.type = c(), sum.frac = c()
-  )
-  for (type.i in cell.type.list) {
-    sample.idx <- retina.st.filter$sample.name == sample.i
-    sum.frac.i <- sum(
-      correct.cell2loction[type.i, Cells(retina.st.filter)[sample.idx]]
-    )
-    type.curve$sample <- c(type.curve$sample, sample.i)
-    type.curve$cell.type <- c(type.curve$cell.type, type.i)
-    type.curve$sum.frac <- c(type.curve$sum.frac, sum.frac.i)
-  }
-  
-  type.curve <- as.data.frame(type.curve)
-  type.curve$inferred.frac <- (
-    type.curve$sum.frac / sum(type.curve$sum.frac)
-  )
-  type.curve.change[[sample.i]] <- type.curve
-}
-
-type.curve.change <- do.call(rbind, type.curve.change)
-type.curve.change$sample <- factor(
-  type.curve.change$sample, levels = sample.list
-)
-type.curve.change$inferred.frac <- type.curve.change$inferred.frac * 100
-type.curve.change$group <- "Precursor cell types"
-diff.idx <- type.curve.change$cell.type %in% cell.type.list[1:6]
-type.curve.change$group[diff.idx] <- "Differentiated cell types"
-
-pic.b1 <- ggplot(
-  type.curve.change[type.curve.change$group == "Differentiated cell types", ],
-  aes(
-    x = sample, y = inferred.frac,
-    color = cell.type, group = cell.type
-  )
-) + geom_line(linewidth = 0.3) +
-  geom_point(shape = 18) +
-  scale_y_continuous(limits = c(0, 50)) +
-  theme_bw() +
-  theme(
-    axis.title = element_blank(),
-    legend.title = element_blank(),
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    axis.text = element_text(color = "black")
-  ) +
-  scale_color_manual(values = cell.type.colors[1:6]) +
-  facet_grid(. ~ group)
-
-pic.b2 <- ggplot(
-  type.curve.change[type.curve.change$group != "Differentiated cell types", ],
-  aes(
-    x = sample, y = inferred.frac,
-    color = cell.type, group = cell.type
-  )
-) + geom_line(linewidth = 0.3) +
-  geom_point(shape = 18) +
-  scale_y_continuous(limits = c(0, 50)) +
-  theme_bw() +
-  theme(
-    axis.title = element_blank(),
-    legend.title = element_blank(),
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    axis.text = element_text(color = "black")
-  ) +
-  scale_color_manual(values = cell.type.colors[7:10]) +
-  facet_grid(. ~ group)
-
-pic.b1 | pic.b2
-ggsave(
-  "outputs/Visualization/fig-2b.pdf",
-  width = 8, height = 4
-)
-
-# Spatial-temporal cell-type distribution (Fig. 2c) ####
+# Spatial-temporal cell-type distribution (Fig. 2b) ####
 coord.add.t <- data.frame(
   x = rep(0, 6),
   y = seq(0, 5, 1) * (-15),
@@ -172,7 +96,7 @@ for (type.i in sort(cell.type.list[1:6])) {
         coord.add.1[retina.st.filter$sample.name, "y"]
     )
   )
-  
+
   for (sample.i in sample.list) {
     pic.c <- create.empty.bk(
       pic.c,
@@ -180,13 +104,13 @@ for (type.i in sort(cell.type.list[1:6])) {
       coord.add.t[type.i, "y"] + coord.add.1[sample.i, "y"]
     )
   }
-  
+
   pic.c <- pic.c +
     geom_point(
       data = plot.data.i, size = 0.4,
       mapping = aes(x = x, y = y, color = value)
     ) +
-    scale_color_gradient(low = "#DDDDDD", high = cell.type.colors[type.i]) +
+    scale_color_gradient(low = "#FFFFFF", high = cell.type.colors[type.i]) +
     new_scale_color()
 }
 pic.c +
@@ -201,6 +125,84 @@ pic.c +
   coord_fixed()
 
 ggsave(
-  "outputs/Visualization/fig-2c.pdf",
+  "outputs/Visualization/fig-2b.pdf",
   width = 10, height = 8
+)
+
+# Pseudo cell type proportion change curve (Fig. 2c) ####
+type.curve.change <- list()
+for (sample.i in sample.list) {
+  type.curve <- list(
+    sample = c(), cell.type = c(), sum.frac = c()
+  )
+  for (type.i in cell.type.list) {
+    sample.idx <- retina.st.filter$sample.name == sample.i
+    sum.frac.i <- sum(
+      correct.cell2loction[type.i, Cells(retina.st.filter)[sample.idx]]
+    )
+    type.curve$sample <- c(type.curve$sample, sample.i)
+    type.curve$cell.type <- c(type.curve$cell.type, type.i)
+    type.curve$sum.frac <- c(type.curve$sum.frac, sum.frac.i)
+  }
+
+  type.curve <- as.data.frame(type.curve)
+  type.curve$inferred.frac <- (
+    type.curve$sum.frac / sum(type.curve$sum.frac)
+  )
+  type.curve.change[[sample.i]] <- type.curve
+}
+
+type.curve.change <- do.call(rbind, type.curve.change)
+type.curve.change$sample <- factor(
+  type.curve.change$sample, levels = sample.list
+)
+type.curve.change$inferred.frac <- type.curve.change$inferred.frac * 100
+type.curve.change$group <- "Precursor cell types"
+diff.idx <- type.curve.change$cell.type %in% cell.type.list[1:6]
+type.curve.change$group[diff.idx] <- "Differentiated cell types"
+
+pic.c1 <- ggplot(
+  type.curve.change[type.curve.change$group == "Differentiated cell types",],
+  aes(
+    x = sample, y = inferred.frac,
+    color = cell.type, group = cell.type
+  )
+) +
+  geom_line(linewidth = 0.3) +
+  geom_point(shape = 18) +
+  scale_y_continuous(limits = c(0, 50)) +
+  theme_bw() +
+  theme(
+    axis.title = element_blank(),
+    legend.title = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text = element_text(color = "black")
+  ) +
+  scale_color_manual(values = cell.type.colors[1:6]) +
+  facet_grid(. ~ group)
+
+pic.c2 <- ggplot(
+  type.curve.change[type.curve.change$group != "Differentiated cell types",],
+  aes(
+    x = sample, y = inferred.frac,
+    color = cell.type, group = cell.type
+  )
+) +
+  geom_line(linewidth = 0.3) +
+  geom_point(shape = 18) +
+  scale_y_continuous(limits = c(0, 50)) +
+  theme_bw() +
+  theme(
+    axis.title = element_blank(),
+    legend.title = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text = element_text(color = "black")
+  ) +
+  scale_color_manual(values = cell.type.colors[7:10]) +
+  facet_grid(. ~ group)
+
+pic.c1 | pic.c2
+ggsave(
+  "outputs/Visualization/fig-2c.pdf",
+  width = 7, height = 4
 )

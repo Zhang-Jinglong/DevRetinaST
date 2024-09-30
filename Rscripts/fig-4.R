@@ -27,12 +27,12 @@ for (reg.i in 1:nrow(reg.unique)) {
     (reg.gene.df$domain == reg.unique$domain[reg.i]) &
       (reg.gene.df$source == reg.unique$source[reg.i])
   )
-  reg.sub.i <- reg.gene.df[reg.sub.idx.i, ]
-  
+  reg.sub.i <- reg.gene.df[reg.sub.idx.i,]
+
   reg.sub.top.i <- order(
     reg.sub.i$avg_log2FC, decreasing = TRUE
   )[1:min(top.k, nrow(reg.sub.i))]
-  reg.sub.i <- reg.sub.i[reg.sub.top.i, ]
+  reg.sub.i <- reg.sub.i[reg.sub.top.i,]
   reg.sub.list <- c(reg.sub.list, list(reg.sub.i))
 }
 reg.sub.df <- do.call("rbind", reg.sub.list)
@@ -41,7 +41,7 @@ reg.sub.df <- do.call("rbind", reg.sub.list)
 reg.sub.df.order <- order(
   reg.sub.df$source, reg.sub.df$target, reg.sub.df$domain
 )
-reg.sub.df <- reg.sub.df[reg.sub.df.order, ]
+reg.sub.df <- reg.sub.df[reg.sub.df.order,]
 
 reg.sub.df$name <- paste(
   reg.sub.df$source, reg.sub.df$target, reg.sub.df$domain
@@ -62,7 +62,7 @@ gene.color <- unique(data.frame(
   gene = reg.sub.df$gene, type = reg.sub.df$type, color = "NA"
 ))
 rownames(gene.color) <- gene.color$gene
-gene.color <- gene.color[reg.sub.gene.unique, ]
+gene.color <- gene.color[reg.sub.gene.unique,]
 
 gene.color$color[gene.color$type == "TF only"] <- "#02818A"
 gene.color$color[gene.color$type == "RBP only"] <- "#002672"
@@ -89,7 +89,8 @@ ggplot(
     axis.text.y = element_text(face = "bold", color = "black"),
     axis.ticks = element_blank(),
     axis.title = element_blank()
-  ) + coord_fixed() +
+  ) +
+  coord_fixed() +
   labs(size = "-log10(p.adj)", color = "avg_log2FC")
 
 ggsave(
@@ -101,7 +102,7 @@ ggsave(
 ## Group gene expression ####
 key.gene <- c("LGALS1", "DCN", "NRL", "NEUROD1", "LDHA", "HES5")
 term.list <- list()
-exp.mat <- retina.st.domain@assays$Spatial@data[key.gene, ]
+exp.mat <- retina.st.domain@assays$Spatial@data[key.gene,]
 for (gene.i in key.gene) {
   for (domain.i in domain.list[1:8]) {
     for (sample.i in sample.list) {
@@ -136,19 +137,19 @@ max.num <- 2
 min.num <- -2
 pic.list <- list()
 for (gene.i in key.gene) {
-  key.df.i <- key.df[key.df$gene == gene.i, ]
+  key.df.i <- key.df[key.df$gene == gene.i,]
   key.df.i$values <- scale(key.df.i$values)
   key.df.i$values[key.df.i$values > max.num] <- max.num
   key.df.i$values[key.df.i$values < min.num] <- min.num
-  
-  key.df.blank.i <- key.df.i[key.df.i$sample == "PCW9", ]
+
+  key.df.blank.i <- key.df.i[key.df.i$sample == "PCW9",]
   key.df.blank.i$sample <- "blank"
   key.df.blank.i$values <- 0
   key.df.i <- rbind(key.df.i, key.df.blank.i)
   key.df.i$sample <- factor(
     key.df.i$sample, levels = c("blank", sample.list)
   )
-  
+
   pic.list[[gene.i]] <- ggplot(key.df.i) +
     geom_bar(
       aes(x = sample, y = gene, fill = values),
@@ -163,20 +164,22 @@ for (gene.i in key.gene) {
       color = "black"
     ) +
     coord_polar(theta = "y", direction = -1) +
-    theme_void() + ggtitle(gene.i)
+    theme_void() +
+    ggtitle(gene.i)
 }
 
 (pic.list[["LGALS1"]] | pic.list[["DCN"]] | pic.list[["NRL"]]) /
   (pic.list[["NEUROD1"]] | pic.list[["LDHA"]] | pic.list[["HES5"]])
+
 ggsave(
   "outputs/Visualization/fig-4b.pdf",
   width = 12, height = 8
 )
 
-# VEGFA/PGF visualization (Fig. 4c) ####
-key.gene <- c("VEGFA", "PGF")
+# Growth factor visualization (Fig. 4c) ####
+key.gene <- c("VEGFA", "PGF", "CCN2", "IGF2", "FGF2", "VGF")
 term.list <- list()
-exp.mat <- retina.st.domain@assays$Spatial@data[key.gene, ]
+exp.mat <- retina.st.domain@assays$Spatial@data[key.gene,]
 for (gene.i in key.gene) {
   for (domain.i in domain.list[1:8]) {
     for (sample.i in sample.list) {
@@ -207,16 +210,15 @@ key.gene.plot <- function(df) {
     df,
     aes(x = sample, y = values, color = domain, group = domain)
   ) +
-    geom_smooth(method = "loess", formula = y ~ x, span = 2, se = FALSE) +
-    scale_color_manual(values = domain.colors) +
-    scale_y_continuous(
-      na.value = 0,
-      limits = c(max(0, min(df$values - 1e-2)), max(df$values + 1e-2))
+    geom_smooth(
+      method = "loess", formula = y ~ x, span = 2,
+      se = FALSE, linewidth = 0.5
     ) +
+    scale_color_manual(values = domain.colors) +
+    scale_y_continuous(na.value = 0) +
     theme_bw() +
     theme(
       axis.title.x = element_blank(),
-      axis.ticks.x = element_blank(),
       axis.text = element_text(color = "black"),
       axis.text.x = element_text(angle = 45, hjust = 1),
       panel.grid.minor = element_blank()
@@ -225,14 +227,20 @@ key.gene.plot <- function(df) {
   pic
 }
 
-pic.c1 <- key.gene.plot(key.df[key.df$gene == "VEGFA", ]) +
-  theme(legend.position = "none") +
-  ylab("Average expression")
-pic.c2 <- key.gene.plot(key.df[key.df$gene == "PGF", ]) +
-  theme(axis.title.y = element_blank())
+pic.list <- list()
+for (gene.i in unique(key.df$gene)) {
+  pic.list <- c(pic.list, list(
+    key.gene.plot(key.df[key.df$gene == gene.i,]) +
+      theme(legend.position = "none") +
+      ylab("Average expression")
+  ))
+}
 
-pic.c1 | pic.c2
+(pic.list[[1]] | pic.list[[2]]) /
+  (pic.list[[3]] | pic.list[[4]]) /
+  (pic.list[[5]] | pic.list[[6]])
+
 ggsave(
   "outputs/Visualization/fig-4c.pdf",
-  width = 6, height = 5
+  width = 6, height = 7
 )

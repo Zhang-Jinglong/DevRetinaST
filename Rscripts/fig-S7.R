@@ -1,8 +1,8 @@
 # Packages & settings ####
-library(Seurat)
 library(ggplot2)
-library(WGCNA)
-library(pheatmap)
+library(ggrepel)
+library(grid)
+library(ggforce)
 library(clusterProfiler)
 
 rm(list = ls())
@@ -10,104 +10,163 @@ source("scripts/utils.R")
 
 # Load data ####
 load("outputs/Domain/retina_st_domain.RData")
-load("outputs/Deconvolution/decon_results.RData")
-load("outputs/WGCNA/sft.RData")
-load("outputs/WGCNA/net.RData")
-load("outputs/DEG/me_go.RData")
+load("outputs/Domain/diff_res_num_list.RData")
+load("outputs/DEG/domain_deg.RData")
+load("outputs/DEG/domain_deg_go.RData")
+load("outputs/ImageProcessing/coordinate_HE.RData")
 
 retina.st.domain$domain <- factor(
   domain.list[as.character(retina.st.domain$domain)], levels = domain.list
 )
 
-# Scale independence & mean connectivity (Fig. S7a-S7b) ####
-## Scale independence ####
-plot.data <- data.frame(
-  x = sft$fitIndices$Power,
-  y = -sign(sft$fitIndices$slope) * sft$fitIndices$SFT.R.sq,
-  label = seq(1, nrow(sft$fitIndices))
+# Domain resolution selection (Fig. S7a) ####
+plot.df <- data.frame(
+  group = c(rep("Up-regulated", 11), rep("Down-regulated", 11)),
+  value = c(diff.res.num.list[["pos"]], diff.res.num.list[["neg"]]),
+  res = rep(seq(0.5, 1.5, by = 0.1), 2)
+)
+plot.df$group <- factor(
+  plot.df$group, levels = c("Up-regulated", "Down-regulated")
 )
 
-pic.a <- ggplot(plot.data) +
-  geom_text(aes(x = x, y = y, label = label), color = "red") +
-  geom_hline(yintercept = 0.85, linetype = 3, color = "red") +
-  xlab("Soft threshold (power)") +
-  ylab("Scale-free topology model fit, signed R^2") +
+ggplot(plot.df) +
+  geom_line(aes(x = res, y = value, group = group, color = group)) +
+  scale_x_continuous(breaks = seq(0.5, 1.5, by = 0.1)) +
   theme_bw() +
   theme(
-    axis.text = element_text(color = "black")
-  )
-
-## Mean connectivity ####
-plot.data <- data.frame(
-  x = sft$fitIndices$Power,
-  y = sft$fitIndices$mean.k.,
-  label = seq(1, nrow(sft$fitIndices))
-)
-
-pic.b <- ggplot(plot.data) +
-  geom_text(aes(x = x, y = y, label = label), color = "red") +
-  geom_hline(yintercept = 0, linetype = 3, color = "red") +
-  xlab("Soft threshold (power)") +
-  ylab("Mean connectivity") +
-  theme_bw() +
-  theme(
-    axis.text = element_text(color = "black")
-  )
-
-## Subplots concatenation ####
-pic.a + pic.b
+    axis.text = element_text(color = "black"),
+    panel.grid.minor = element_blank(),
+    legend.position = c(0.82, 0.88),
+    legend.background = element_rect(color = "black")
+  ) +
+  ylab("Minimum number of DEGs across all domains") +
+  xlab("Louvain resolution") +
+  labs(color = "DEG type")
 
 ggsave(
-  "outputs/Visualization/fig-S7ab.pdf",
-  width = 8, height = 4
+  "outputs/Visualization/fig-S7a.pdf",
+  width = 5, height = 5
 )
 
-# Weight adjacency heat map (Fig. S7c) ####
-me.data <- net$MEs
-me.data <- me.data[, -ncol(me.data)]
+# Domain DEG (Fig. S7b) ####
+## Annotate top 5 gene ####
+domain.deg$label <- NA
+for (domain.i in domain.list) {
+  marker.idx <- which(
+    domain.deg$cluster == domain.i & domain.deg$avg_log2FC > 0
+  )
+  anno.idx <- order(
+    abs(domain.deg$avg_log2FC[marker.idx]), decreasing = TRUE
+  )[1:5]
+  anno.idx <- marker.idx[anno.idx]
+  domain.deg[anno.idx, "label"] <- domain.deg[anno.idx, "gene"]
 
-pdf(file = "outputs/Visualization/fig-S7c.pdf", width = 5, height = 4)
-plotEigengeneNetworks(
-  me.data, setLabels = "Weight adjacency heatmap",
-  plotDendrograms = FALSE, xLabelsAngle = 0, marHeatmap = c(3, 3, 3, 3)
+  marker.idx <- which(
+    domain.deg$cluster == domain.i & domain.deg$avg_log2FC < 0
+  )
+  anno.idx <- order(
+    abs(domain.deg$avg_log2FC[marker.idx]), decreasing = TRUE
+  )[1:3]
+  anno.idx <- marker.idx[anno.idx]
+  domain.deg[anno.idx, "label"] <- domain.deg[anno.idx, "gene"]
+}
+
+ggplot(
+  domain.deg,
+  aes(x = cluster, y = avg_log2FC, label = label, color = cluster)
+) +
+  geom_jitter(position = position_jitter(seed = 1, width = 0.35)) +
+  geom_text_repel(
+    position = position_jitter(seed = 1, width = 0.35),
+    color = "black", max.overlaps = 10
+  ) +
+  scale_color_manual(values = domain.colors) +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title.x = element_blank()
+  )
+
+ggsave(
+  "outputs/Visualization/fig-S7b.pdf",
+  width = 10, height = 5
 )
-dev.off()
 
-# Gene module domain enrichment (Fig. S7d) ####
-shuffle.idx <- sample(1:ncol(retina.st.domain))
-spot.idx <- order(retina.st.domain$domain[shuffle.idx])
-anno_col <- data.frame(
-  Domain = retina.st.domain$domain[shuffle.idx][spot.idx],
-  row.names = Cells(retina.st.domain)[shuffle.idx][spot.idx]
-)
-anno_colors <- list(Domain = domain.colors)
-
-bk <- c(seq(-1, -0.01, by = 0.01), seq(0, 1, by = 0.01))
-pheatmap(
-  t(net$MEs)[paste0("ME", 1:4), shuffle.idx[spot.idx]], scale = "row",
-  cluster_rows = FALSE, cluster_cols = FALSE,
-  clustering_distance_rows = "correlation",
-  clustering_distance_cols = "correlation",
-  show_rownames = TRUE, show_colnames = FALSE,
-  annotation_col = anno_col,
-  annotation_colors = anno_colors,
-  color = c(
-    colorRampPalette(colors = c("#5D94A4", "white"))(length(bk) / 2),
-    colorRampPalette(colors = c("white", "#DA3B46"))(length(bk) / 2)
-  ), breaks = bk,
-  filename = "outputs/Visualization/fig-S7d.pdf",
-  width = 6, height = 4.5
-)
-
-# Gene module GO (Fig. S7e) ####
+# Domain DEG GO (Fig. S7c) ####
 dotplot(
-  me.go,
+  deg.go,
   label_format = 100,
   font.size = 9,
-  showCategory = 7
+  showCategory = 5
 )
 
 ggsave(
-  "outputs/Visualization/fig-S7e.pdf",
-  width = 7, height = 6
+  "outputs/Visualization/fig-S7c.pdf",
+  width = 12, height = 6
+)
+
+# Spatial distribution for clusters (Fig. S7d) ####
+img.list <- img.list[1:5]
+coo.list <- coo.list[1:5]
+
+max.y <- dim(img.list[[1]])[1]
+start.x <- 0
+for (i in 2:length(img.list)) {
+  start.x <- c(start.x, start.x[i - 1] + dim(img.list[[i - 1]])[2] + 100)
+  coo.list[[i]]$coord.x <- coo.list[[i]]$coord.x + start.x[i]
+  if (max.y < dim(img.list[[i]])[1]) {
+    max.y <- dim(img.list[[i]])[1]
+  }
+}
+start.y <- NULL
+for (i in seq_along(coo.list)) {
+  start.y <- c(start.y, ceiling((max.y - dim(img.list[[i]])[1]) / 2))
+  coo.list[[i]]$coord.y <- coo.list[[i]]$coord.y + start.y[i]
+}
+coo <- do.call("rbind", coo.list)
+rownames(coo) <- sub("^[^.]*\\.", "", rownames(coo))
+
+pic <- ggplot()
+for (i in seq_along(img.list)) {
+  img.i <- img.list[[i]]
+  pic <- pic +
+    annotation_custom(
+      rasterGrob(
+        img.i,
+        width = unit(1, "npc"),
+        height = unit(1, "npc")
+      ),
+      xmin = start.x[i], xmax = start.x[i] + dim(img.i)[2],
+      ymin = start.y[i], ymax = start.y[i] + dim(img.i)[1]
+    )
+}
+
+coo$domain <- retina.st.domain@meta.data[rownames(coo), "domain"]
+pic +
+  geom_point(
+    data = coo,
+    aes(x = coord.x, y = coord.y, fill = domain),
+    size = 1, shape = 21, color = "white", stroke = 0.1
+  ) +
+  scale_fill_manual(values = domain.colors) +
+  coord_fixed(
+    xlim = c(0, start.x[5] + dim(img.list[[5]])[2]),
+    ylim = c(0, max.y), expand = FALSE
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    axis.title = element_blank(),
+    panel.grid = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    panel.spacing = element_blank()
+  )
+
+ggsave(
+  "outputs/Visualization/fig-S7d.pdf",
+  width = 12, height = 4
 )

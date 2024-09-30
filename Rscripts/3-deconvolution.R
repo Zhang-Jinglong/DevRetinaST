@@ -7,6 +7,7 @@ source("scripts/utils.R")
 # Load data ####
 load("outputs/QualityControl/retina_st_filter.RData")
 load("outputs/QualityControl/retina_sc_filter.RData")
+load("outputs/QualityControl/retina_st_pub.RData")
 
 ## Remove cell types with too few cells (4 cells) ####
 table(data.frame(
@@ -66,4 +67,35 @@ correct.cell2loction <- t(t(pred.cell2loction) * pred.density)
 save(
   pred.cell2loction, correct.cell2loction,
   file = "outputs/Deconvolution/decon_results.RData"
+)
+
+# Additional experiments ####
+## Convert public ST data ####
+st.count <- data.frame(retina.st.pub@assays$Spatial@counts)
+write.csv(
+  st.count,
+  file = "outputs/Deconvolution/Cell2location/retina_st_pub.csv"
+)
+st.metadata <- data.frame(
+  batch = retina.st.pub$image.prefix
+)
+write.csv(
+  st.metadata,
+  file = "outputs/Deconvolution/Cell2location/retina_st_meta_pub.csv"
+)
+
+## python 3-deconvolution pub.py ####
+## outputs: "outputs/Deconvolution/Cell2location/cell2location_pub.csv"
+
+## Save data ####
+pub.cell2loction <- as.matrix(read.csv(
+  "outputs/Deconvolution/Cell2location/cell2location_pub.csv",
+  row.names = 1, check.names = FALSE
+))
+pub.cell2loction <- t(t(pub.cell2loction) / colSums(pub.cell2loction))
+colnames(pub.cell2loction) <- sub("^.", "", colnames(pub.cell2loction))
+
+save(
+  pub.cell2loction,
+  file = "outputs/Deconvolution/decon_results_pub.RData"
 )

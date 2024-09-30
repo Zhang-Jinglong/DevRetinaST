@@ -58,10 +58,10 @@ create.spatial.graph <- function(coordinate) {
   distance <- as.matrix(
     dist(coordinate[, 4:5], method = "euclidean")
   ) + (diag(nrow(coordinate)) * 1e7)
-  
+
   distance[distance > min(distance) * 1.5] <- 0
   distance[distance > 0] <- 1
-  
+
   distance
 }
 
@@ -70,17 +70,17 @@ create.label.mesh <- function(labels, start) {
   point.old <- start
   labels$flag <- FALSE
   count <- 0
-  
+
   labels.mesh <- list()
   while (count < (nrow(labels))) {
     dist.i <- sqrt(
-      ((labels$x - point.old$x) ^ 2) + ((labels$y - point.old$y) ^ 2)
+      ((labels$x - point.old$x)^2) + ((labels$y - point.old$y)^2)
     )
     dist.i[labels$flag] <- Inf
     min.i <- which.min(dist.i)
     point.new <- labels[min.i, 1:2]
     labels[min.i, "flag"] <- TRUE
-    
+
     if (count > 0) {
       mesh.num <- as.integer(dist.i[min.i])
       mesh.step <- seq(1e-2, 1 - 1e-2, 1 / mesh.num)
@@ -94,7 +94,7 @@ create.label.mesh <- function(labels, start) {
     point.old <- point.new
     count <- count + 1
   }
-  
+
   labels.mesh.df <- do.call("rbind", labels.mesh)
   labels.mesh.df
 }
@@ -112,7 +112,7 @@ create.all.mesh <- function(label.df) {
     labels = label.df[label.df$label == "B2", 2:3],
     start = label.df[label.df$label == "START", 2:3]
   )
-  
+
   list(PE = label.PE, B1 = label.B1, B2 = label.B2)
 }
 
@@ -122,21 +122,22 @@ create.empty.bk <- function(pic, x0, y0) {
     geom_circle(
       data = data.frame(),
       aes(x0 = x0, y0 = y0, r = 7),
-      fill = "#BBBBBB", color = "#777777"
+      fill = "#CCCCCC", color = "#222222"
     ) +
     geom_circle(
       aes(x0 = x0, y0 = y0, r = 6),
-      fill = "#DDDDDD", color = "#777777"
+      fill = "#EEEEEE", color = "#222222"
     ) +
     geom_circle(
       aes(x0 = x0, y0 = y0, r = 5),
-      fill = "#FFFFFF", color = "#777777"
+      fill = "#FFFFFF", color = "#222222"
     ) +
     geom_ellipse(
       aes(x0 = x0 + 5.2, y0 = y0, a = 2.4, b = 4.0, angle = 0),
-      fill = "#FFFFFF", color = "#777777"
-    ) + new_scale_color()
-  
+      fill = "#FFFFFF", color = "#222222"
+    ) +
+    new_scale_color()
+
   pic.bk
 }
 
@@ -145,15 +146,15 @@ diff.res.num <- function(obj, min.res, max.res, res.gap) {
   deg.num.pos <- c()
   deg.num.neg <- c()
   res.seq <- seq(min.res, max.res, by = res.gap)
-  
+
   for (res.i in res.seq) {
     obj <- SetIdent(obj, value = paste0("Spatial_mix_res.", res.i))
     obj.diff <- FindAllMarkers(
       obj, test.use = "wilcox",
       logfc.threshold = 0.25, min.pct = 0.1
     )
-    obj.diff <- obj.diff[obj.diff$p_val_adj < 0.05, ]
-    
+    obj.diff <- obj.diff[obj.diff$p_val_adj < 0.05,]
+
     # Calculate number
     obj.diff.pos <- obj.diff %>%
       filter(avg_log2FC > 0) %>%
@@ -164,7 +165,7 @@ diff.res.num <- function(obj, min.res, max.res, res.gap) {
       obj.diff.pos.num <- 0
     }
     deg.num.pos[as.character(res.i)] <- obj.diff.pos.num
-    
+
     obj.diff.neg <- obj.diff %>%
       filter(avg_log2FC < 0) %>%
       count(cluster, name = "number")
@@ -175,6 +176,6 @@ diff.res.num <- function(obj, min.res, max.res, res.gap) {
     }
     deg.num.neg[as.character(res.i)] <- obj.diff.neg.num
   }
-  
+
   list(pos = deg.num.pos, neg = deg.num.neg)
 }

@@ -79,3 +79,42 @@ save(
   retina.st.filter,
   file = "outputs/QualityControl/retina_st_filter.RData"
 )
+
+# Additional experiments ####
+## GSE234035 ####
+load("outputs/MergeData/retina_st_pub.RData")
+
+retina.st.pub$pct.mt <- PercentageFeatureSet(
+  retina.st.pub, pattern = "^MT-"
+)
+
+retina.st.pub <- subset(
+  retina.st.pub,
+  subset = pct.mt < 10 &
+    nCount_Spatial > 100
+)
+
+retina.st.pub <- subset(
+  retina.st.pub,
+  subset = retina == TRUE
+)
+
+gene.ava <- (
+  (!grepl("^MT-", rownames(retina.st.pub))) &
+    (!grepl("^RP[SL]", rownames(retina.st.pub)))
+)
+retina.st.pub <- subset(
+  retina.st.pub,
+  feature = rownames(retina.st.pub)[gene.ava]
+)
+
+gene.ava <- rowSums(retina.st.pub@assays$Spatial@counts) >= 10
+retina.st.pub <- subset(
+  retina.st.pub,
+  feature = rownames(retina.st.pub)[gene.ava]
+)
+
+save(
+  retina.st.pub,
+  file = "outputs/QualityControl/retina_st_pub.RData"
+)

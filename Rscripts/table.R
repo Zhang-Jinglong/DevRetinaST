@@ -48,26 +48,31 @@ write.csv(
 )
 
 # GCL & NBL DEG (Table S2) ####
-load("outputs/DEG/nbl_gcl_deg.RData")
-deg.df <- rbind(deg.nbl.df, deg.gcl.df)[, c(8, 1:7)]
-colnames(deg.df) <- c(
-  "Sample", "p.value", "avg.log2FC", "pct.1", "pct.2",
+load("outputs/DEG/sublayer_stage_deg.RData")
+sublayer.stage.deg$source <- sapply(strsplit(sublayer.stage.deg$trans, "[.]"), "[", 1)
+sublayer.stage.deg$target <- sapply(strsplit(sublayer.stage.deg$trans, "[.]"), "[", 2)
+sublayer.stage.deg$gene <- rownames(sublayer.stage.deg)
+sublayer.stage.deg <- sublayer.stage.deg[, c(8:9, 1:6, 10)]
+colnames(sublayer.stage.deg) <- c(
+  "Source sample", "Target sample", "p.value", "avg.log2FC", "pct.1", "pct.2",
   "p.adjust", "Sublayer", "Gene"
 )
-deg.df$Sample <- factor(deg.df$Sample, levels = sample.list)
-deg.df$Sublayer <- factor(deg.df$Sublayer, levels = radial.list)
-deg.df <- deg.df[order(deg.df$Sublayer, deg.df$Sample, -deg.df$avg.log2FC), ]
+sublayer.stage.deg$`Source sample` <- factor(sublayer.stage.deg$`Source sample`, levels = sample.list)
+sublayer.stage.deg$`Target sample` <- factor(sublayer.stage.deg$`Target sample`, levels = sample.list)
+sublayer.stage.deg$Sublayer <- factor(sublayer.stage.deg$Sublayer, levels = radial.list)
+order.idx <- order(sublayer.stage.deg$Sublayer, sublayer.stage.deg$`Source sample`, -sublayer.stage.deg$avg.log2FC)
+sublayer.stage.deg <- sublayer.stage.deg[order.idx,]
 
 write.csv(
-  deg.df, file = "outputs/Table/table-S2.csv",
+  sublayer.stage.deg, file = "outputs/Table/table-S2.csv",
   row.names = FALSE
 )
 
 # GCL & NBL DEG GO (Table S3) ####
-load("outputs/DEG/nbl_gcl_deg_go.RData")
-deg.go.df <- deg.go@result
+load("outputs/DEG/sublayer_deg_go.RData")
+deg.go.df <- deg.go@compareClusterResult[, 2:11]
 colnames(deg.go.df) <- c(
-  "GO ID", "Description", "GeneRatio", "BgRatio", "p.value", "p.adjust",
+  "Sublayer", "GO ID", "Description", "GeneRatio", "BgRatio", "p.value", "p.adjust",
   "q.value", "GeneID", "Count"
 )
 
@@ -94,9 +99,9 @@ exp.mat <- retina.st.domain@assays$Spatial@data
 frac.mat <- pred.cell2loction[, colnames(exp.mat)]
 for (marker.i in 1:nrow(pre.marker)) {
   if (!is.na(pre.marker$SCC[marker.i])) {
-    exp.i <- exp.mat[pre.marker$Gene[marker.i], ]
-    frac.i <- frac.mat[pre.marker$`Cell type`[marker.i], ]
-    
+    exp.i <- exp.mat[pre.marker$Gene[marker.i],]
+    frac.i <- frac.mat[pre.marker$`Cell type`[marker.i],]
+
     corr.i <- cor.test(
       x = exp.i, y = frac.i, method = "spearman", exact = TRUE
     )
@@ -139,7 +144,7 @@ colnames(domain.deg) <- c(
   "p.adjust", "Domain", "Gene"
 )
 domain.deg$Domain <- factor(domain.deg$Domain, levels = domain.list)
-domain.deg <- domain.deg[order(domain.deg$Domain, -domain.deg$avg.log2FC), ]
+domain.deg <- domain.deg[order(domain.deg$Domain, -domain.deg$avg.log2FC),]
 
 write.csv(
   domain.deg, file = "outputs/Table/table-S6.csv",
@@ -159,13 +164,13 @@ write.csv(
   row.names = FALSE
 )
 
-# Gene module (Table S8) ####
+# Gene module (Table S9) ####
 me.list <- list()
 for (me.i in paste0("ME", 1:4)) {
   gene.i <- as.character(read.csv(
     paste0("outputs/WGCNA/", me.i, ".txt"), header = FALSE
   )$V1)
-  
+
   if (me.i != "ME1") {
     gene.i <- c(gene.i, rep("", length(me.list[["ME1"]]) - length(gene.i)))
   }
@@ -175,11 +180,11 @@ me.df <- as.data.frame(me.list)
 colnames(me.df) <- paste0("Module ", 1:4)
 
 write.csv(
-  me.df, file = "outputs/Table/table-S8.csv",
+  me.df, file = "outputs/Table/table-S9.csv",
   row.names = FALSE
 )
 
-# Gene module GO (Table S9) ####
+# Gene module GO (Table S10) ####
 load("outputs/DEG/me_go.RData")
 me.go.df <- me.go@compareClusterResult[, -2][, c(2, 1, 3:10)]
 colnames(me.go.df) <- c(
@@ -188,11 +193,11 @@ colnames(me.go.df) <- c(
 )
 
 write.csv(
-  me.go.df, file = "outputs/Table/table-S9.csv",
+  me.go.df, file = "outputs/Table/table-S10.csv",
   row.names = FALSE
 )
 
-# Regulatory gene (Table S10) ####
+# Regulatory gene (Table S11) ####
 load("outputs/Development/reg_gene_df.RData")
 reg.gene.df <- reg.gene.df[, c(8, 9, 7, 1:6, 10)]
 colnames(reg.gene.df) <- c(
@@ -207,14 +212,24 @@ reg.gene.df$Domain <- factor(reg.gene.df$Domain, levels = domain.list)
 order.idx <- order(
   reg.gene.df$`Source sample`, reg.gene.df$Domain, -reg.gene.df$avg.log2FC
 )
-reg.gene.df <- reg.gene.df[order.idx, ]
+reg.gene.df <- reg.gene.df[order.idx,]
 
 write.csv(
-  reg.gene.df, file = "outputs/Table/table-S10.csv",
+  reg.gene.df, file = "outputs/Table/table-S11.csv",
   row.names = FALSE
 )
 
-# Regulatory gene GO (Table S11) ####
+# Key TF in SCRIPRO (Table S12) ####
+tf.target.net <- read.csv(
+  "outputs/Development/SCRIPro/scripro_tf_target_strength.csv"
+)[, 2:4]
+
+write.csv(
+  tf.target.net, file = "outputs/Table/table-S12.csv",
+  row.names = FALSE
+)
+
+# Regulatory gene GO (Table S13) ####
 load("outputs/DEG/reg_gene_go.RData")
 reg.go.df <- reg.go@result
 colnames(reg.go.df) <- c(
@@ -223,11 +238,11 @@ colnames(reg.go.df) <- c(
 )
 
 write.csv(
-  reg.go.df, file = "outputs/Table/table-S11.csv",
+  reg.go.df, file = "outputs/Table/table-S13.csv",
   row.names = FALSE
 )
 
-# Disease gene (Table S12) ####
+# Disease gene (Table S14) ####
 retnet.table <- readxl::read_excel(
   "outputs/Reference/RetNet_20221007.xlsx",
   sheet = "Merge"
@@ -235,11 +250,11 @@ retnet.table <- readxl::read_excel(
 colnames(retnet.table)[3] <- "Gene"
 
 write.csv(
-  retnet.table, file = "outputs/Table/table-S12.csv",
+  retnet.table, file = "outputs/Table/table-S14.csv",
   row.names = FALSE
 )
 
-# Spatial communication score (Table S13) ####
+# Spatial communication score (Table S15) ####
 lr.table <- read.csv(
   "outputs/CCC/COMMOT/retina_db_filter.csv", row.names = 1
 )
@@ -253,21 +268,21 @@ for (sample.i in sample.list) {
   )
   colnames(lr.summary.i) <- c("L-R pair", "SCS")
   lr.summary.i$Sample <- sample.i
-  
+
   lr.summary.list[[sample.i]] <- lr.summary.i[, c(3, 1, 2)]
 }
 lr.summary <- do.call("rbind", lr.summary.list)
 lr.summary$`L-R type` <- lr.table[lr.summary$`L-R pair`, "X3"]
 
 lr.summary$Sample <- factor(lr.summary$Sample, levels = sample.list)
-lr.summary <- lr.summary[order(lr.summary$Sample, -lr.summary$SCS), ]
+lr.summary <- lr.summary[order(lr.summary$Sample, -lr.summary$SCS),]
 
 write.csv(
-  lr.summary, file = "outputs/Table/table-S13.csv",
+  lr.summary, file = "outputs/Table/table-S15.csv",
   row.names = FALSE
 )
 
-# CCC (Table S14) ####
+# CCC (Table S16) ####
 cpdb.means <- read.csv(
   "outputs/CCC/CellPhoneDB/cpdb_filter_means.csv",
   row.names = 1
@@ -302,5 +317,5 @@ for (col.i in colnames(cpdb.means)) {
 }
 
 write.csv(
-  cpdb.cat, file = "outputs/Table/table-S14.csv"
+  cpdb.cat, file = "outputs/Table/table-S16.csv"
 )

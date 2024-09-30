@@ -30,7 +30,7 @@ for (sample.i in sample.list) {
   colnames(lr.summary.i) <- c("LR", "value")
   lr.summary.i$sample <- sample.i
   lr.summary.i$value <- as.numeric(scale(lr.summary.i$value))
-  
+
   lr.summary.list[[sample.i]] <- lr.summary.i
 }
 lr.summary <- do.call("rbind", lr.summary.list)
@@ -40,7 +40,7 @@ lr.summary.df <- aggregate(
 lr.summary.df$type <- lr.table[lr.summary.df$LR, "X3"]
 
 # Spatial communication score (Fig. 6b) ####
-lr.summary.df <- lr.summary.df[order(lr.summary.df$type, lr.summary.df$LR), ]
+lr.summary.df <- lr.summary.df[order(lr.summary.df$type, lr.summary.df$LR),]
 lr.summary.df$LR <- factor(lr.summary.df$LR, levels = unique(lr.summary.df$LR))
 lr.summary.df$label <- as.character(lr.summary.df$LR)
 lr.summary.df$label[lr.summary.df$x < 2.0] <- ""
@@ -61,7 +61,8 @@ ggplot(lr.summary.df) +
     axis.ticks.x = element_blank(),
     panel.grid.major.x = element_blank()
   ) +
-  xlab("Ligand-receptor pair") + labs(color = "LR type") +
+  xlab("Ligand-receptor pair") +
+  labs(color = "LR type") +
   ylab("Average scaled SCS")
 
 ggsave(
@@ -71,8 +72,8 @@ ggsave(
 
 # MDK & LRP1 co-localization (Fig. 6c) ####
 plot.data <- data.frame(
-  l.value = retina.st.domain@assays$Spatial@data["MDK", ],
-  r.value = retina.st.domain@assays$Spatial@data["LRP1", ],
+  l.value = retina.st.domain@assays$Spatial@data["MDK",],
+  r.value = retina.st.domain@assays$Spatial@data["LRP1",],
   x = (
     retina.st.domain$coord.x +
       coord.add.2[retina.st.domain$sample.name, "x"]
@@ -98,20 +99,22 @@ for (sample.i in sample.list) {
 
 pic.c +
   geom_point(
-    data = plot.data, size = 0.5,
-    mapping = aes(x = x, y = y, color = l.value)
+    data = plot.data,
+    size = 1.5, stroke = 0, color = "white", shape = 21,
+    mapping = aes(x = x, y = y, fill = l.value)
   ) +
-  scale_color_gradient2(
-    low = "#8C9AA4", mid = "#CCCCCC", high = "#EE692E",
+  scale_fill_gradient2(
+    low = "#EEEEEE", mid = "#FFFFFF", high = "#EE692E",
     guide = guide_colorbar(order = 1)
   ) +
   new_scale_color() +
   geom_point(
-    data = plot.data, size = 0.1,
+    data = plot.data,
+    size = 0.6, shape = 16,
     mapping = aes(x = x, y = y, color = r.value)
   ) +
   scale_color_gradient2(
-    low = "#8C9AA4", mid = "#CCCCCC", high = "#9A1DEE",
+    low = "#EEEEEE", mid = "#FFFFFF", high = "#9A1DEE",
     guide = guide_colorbar(order = 2)
   ) +
   new_scale_color() +

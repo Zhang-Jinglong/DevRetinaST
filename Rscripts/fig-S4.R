@@ -1,182 +1,184 @@
 # Packages & settings ####
 library(Seurat)
 library(ggplot2)
-library(ggforce)
-library(ggnewscale)
+library(ggpubr)
+library(grid)
+library(patchwork)
+library(viridis)
 
 rm(list = ls())
 source("scripts/utils.R")
 
 # Load data ####
-load("outputs/QualityControl/retina_st_filter.RData")
+load("outputs/Domain/retina_st_domain.RData")
+load("outputs/QualityControl/retina_st_pub.RData")
 load("outputs/Deconvolution/decon_results.RData")
-load("outputs/ImageProcessing/radial_anno.RData")
-load("outputs/ImageProcessing/tangential_anno.RData")
-load("outputs/ImageProcessing/coordinate.RData")
+load("outputs/Deconvolution/decon_results_pub.RData")
+load("outputs/ImageProcessing/coordinate_HE.RData")
 
-spot.list <- Cells(retina.st.filter)
-retina.st.filter$layer <- radial.anno[spot.list, "layer"]
-retina.st.filter$quantile <- radial.anno[spot.list, "quantile"]
-retina.st.filter$tangential <- degree.df[spot.list, "degree"]
-retina.st.filter$coord.x <- spatial.coord.new[spot.list, "coord.x"]
-retina.st.filter$coord.y <- spatial.coord.new[spot.list, "coord.y"]
+retina.st.pub <- NormalizeData(retina.st.pub)
+co.pair <- data.frame(
+  gene = c("MEIS2", "PRKCA", "RRAD", "ONECUT2", "SNCG", "NRL", "HES5"),
+  type = c("AC", "BC", "Cone", "HC", "RGC", "Rod", "RPC")
+)[c(7, 3, 6, 5, 1, 4, 2),]
 
-# Spatial-temporal cell-type distribution (Fig. S4a) ####
-coord.add.t <- data.frame(
-  x = rep(0, 4),
-  y = seq(0, 3, 1) * (-15),
-  row.names = sort(cell.type.list[7:10])
+# Cell-type & marker scatter (Fig. S4a) ####
+stage.mapping <- c(
+  `8PCW` = 8.0, `PCW9` = 9.0, `10PCW` = 10.0, `11PCW` = 11.0,
+  `PCW12_early` = 12.0, `PCW12_late` = 12.0, `13PCW` = 13.0,
+  `PCW14` = 14.0, `PCW16` = 16.0, `PCW17` = 17.0
 )
 
-pic.a <- ggplot()
-for (type.i in sort(cell.type.list[7:10])) {
-  plot.data.i <- data.frame(
-    value = pred.cell2loction[type.i, Cells(retina.st.filter)],
-    x = (
-      retina.st.filter$coord.x +
-        coord.add.t[type.i, "x"] +
-        coord.add.1[retina.st.filter$sample.name, "x"]
-    ),
-    y = (
-      retina.st.filter$coord.y +
-        coord.add.t[type.i, "y"] +
-        coord.add.1[retina.st.filter$sample.name, "y"]
-    )
+pic.list <- list()
+for (i in seq_len(nrow(co.pair))) {
+  df.1 <- data.frame(
+    sample = retina.st.domain$sample.name,
+    exp = retina.st.domain@assays$Spatial@data[co.pair$gene[i],],
+    frac = pred.cell2loction[co.pair$type[i], Cells(retina.st.domain)],
+    source = "This study"
   )
-  
-  for (sample.i in sample.list) {
-    pic.a <- create.empty.bk(
-      pic.a,
-      coord.add.t[type.i, "x"] + coord.add.1[sample.i, "x"],
-      coord.add.t[type.i, "y"] + coord.add.1[sample.i, "y"]
-    )
+  df.2 <- data.frame(
+    sample = retina.st.pub$stage,
+    exp = retina.st.pub@assays$Spatial@data[co.pair$gene[i],],
+    frac = pub.cell2loction[co.pair$type[i], Cells(retina.st.pub)],
+    source = "Dorgau et al."
+  )
+  df <- rbind(df.1, df.2)
+  df$sample <- stage.mapping[as.character(df$sample)]
+  df <- df[df$exp > 0,]
+  df <- df[df$frac > 0,]
+  df <- df[sample.int(nrow(df), nrow(df)),]
+  res <- summary(lm(frac ~ exp + 0, df))
+
+  makeStars <- function(x) {
+    stars <- c("****", "***", "**", "*", "ns")
+    vec <- c(0, 0.0001, 0.001, 0.01, 0.05, 1)
+    i <- findInterval(x, vec)
+    stars[i]
   }
-  
-  pic.a <- pic.a +
-    geom_point(
-      data = plot.data.i, size = 0.4,
-      mapping = aes(x = x, y = y, color = value)
+
+
+  pic.i <- ggplot(df, aes(x = exp, y = frac)) +
+    geom_point(aes(color = sample, shape = source), size = 1) +
+    scale_color_viridis(breaks = c(9, 11, 13, 15, 17), end = 0.9) +
+    scale_shape_manual(values = c(`This study` = 15, `Dorgau et al.` = 4)) +
+    scale_y_continuous(limits = c(0, 1), breaks = c(0.0, 0.2, 0.4, 0.6, 0.8, 1.0)) +
+    geom_smooth(method = "lm", formula = y ~ x + 0, color = "darkblue", linewidth = 0.5) +
+    ggtitle(paste0(
+      "R^2=", format(res$adj.r.squared, digits = 4),
+      ",", makeStars(res$coefficients[[4]])
+    )) +
+    theme_bw() +
+    theme(
+      axis.text = element_text(color = "black")
     ) +
-    scale_color_gradient(low = "#DDDDDD", high = cell.type.colors[type.i]) +
-    new_scale_color()
+    xlab(paste0("Expression of ", co.pair$gene[i])) +
+    ylab(paste0("Fraction of ", co.pair$type[i]))
+
+  pic.list[[i]] <- pic.i
 }
-pic.a +
-  theme_bw() +
-  theme(
-    axis.ticks = element_blank(),
-    axis.title = element_blank(),
-    axis.text = element_blank(),
-    panel.grid = element_blank(),
-    panel.border = element_blank()
-  ) +
-  coord_fixed()
+
+(pic.list[[1]] +
+  pic.list[[2]] +
+  pic.list[[3]] +
+  pic.list[[4]] +
+  pic.list[[5]] +
+  pic.list[[6]] +
+  pic.list[[7]] +
+  plot_spacer()) + plot_layout(ncol = 4)
 
 ggsave(
   "outputs/Visualization/fig-S4a.pdf",
-  width = 10, height = 8
+  width = 16, height = 6
 )
 
-# Radial cell type distribution (Fig. S4b) ####
-meta <- retina.st.filter@meta.data
-meta$quantile[meta$layer == "GCL"] <- meta$quantile[meta$layer == "GCL"] + 1
+# Cell type marker on H&E (Fig. S4b) ####
+merge.coo.list <- c(
+  pub.coo.list["GSM7441442_15817_8PCW_A"], coo.list["PCW9"],
+  pub.coo.list["GSM7441446_15870_10PCW_A"], pub.coo.list["GSM7441450_15685_11PCW_A"],
+  coo.list["PCW12_early"], coo.list["PCW12_late"],
+  pub.coo.list["GSM7441454_14749_13PCW_A"], coo.list["PCW14"],
+  coo.list["PCW16"], coo.list["PCW17"]
+)
+merge.img.list <- c(
+  pub.img.list["GSM7441442_15817_8PCW_A"], img.list["PCW9"],
+  pub.img.list["GSM7441446_15870_10PCW_A"], pub.img.list["GSM7441450_15685_11PCW_A"],
+  img.list["PCW12_early"], img.list["PCW12_late"],
+  pub.img.list["GSM7441454_14749_13PCW_A"], img.list["PCW14"],
+  img.list["PCW16"], img.list["PCW17"]
+)
+merge.obj <- merge(retina.st.pub, retina.st.domain)
 
-meta.list <- list()
-for (type.i in cell.type.list) {
-  meta.list[[type.i]] <- data.frame(
-    type = rep(type.i, nrow(meta)),
-    num = correct.cell2loction[type.i, rownames(meta)],
-    loc = meta$quantile,
-    sample = meta$sample.name,
-    row.names = rownames(meta)
-  )
+max.y <- dim(merge.img.list[[1]])[1]
+start.x <- 0
+for (i in 2:length(merge.img.list)) {
+  start.x <- c(start.x, start.x[i - 1] + dim(merge.img.list[[i - 1]])[2] + 100)
+  merge.coo.list[[i]]$coord.x <- merge.coo.list[[i]]$coord.x + start.x[i]
+  if (max.y < dim(merge.img.list[[i]])[1]) {
+    max.y <- dim(merge.img.list[[i]])[1]
+  }
 }
-meta.df <- do.call("rbind", meta.list)
+start.y <- NULL
+for (i in seq_along(merge.coo.list)) {
+  start.y <- c(start.y, ceiling((max.y - dim(merge.img.list[[i]])[1]) / 2))
+  merge.coo.list[[i]]$coord.y <- merge.coo.list[[i]]$coord.y + start.y[i]
+}
+merge.coo <- do.call("rbind", merge.coo.list)
+rownames(merge.coo) <- sub("^[^.]*\\.", "", rownames(merge.coo))
 
-pic.list <- list()
-for (sample.i in sample.list) {
-  pic.list[[sample.i]] <- ggplot(meta.df[meta.df$sample == sample.i, ]) +
-    geom_smooth(
-      aes(x = loc, y = num, group = type, color = type),
-      method = "glm", se = FALSE, formula = y ~ poly(x, 3),
-      method.args = list(family = quasibinomial)
-    ) + theme_classic() +
-    scale_color_manual(values = cell.type.colors) +
-    scale_x_continuous(
-      breaks = c(0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0),
-      labels = c(radial.list, "Border")
-    ) +
-    scale_y_continuous(
-      breaks = seq(0, 10) / 10,
-      labels = seq(0, 10) * 10
-    ) +
-    coord_cartesian(ylim = c(0, 0.65)) +
-    geom_vline(xintercept = c(0.25, 0.5, 0.75, 1.0, 1.5), linetype = 3) +
-    theme(
-      legend.position = "none",
-      panel.grid = element_blank(),
-      axis.title = element_blank(),
-      axis.line = element_line(linewidth = 0.1),
-      axis.text = element_text(color = "black"),
-      axis.text.x = element_text(angle = 45, hjust = 1)
+pic <- ggplot()
+for (i in seq_along(merge.img.list)) {
+  img.i <- merge.img.list[[i]]
+  pic <- pic +
+    annotation_custom(
+      rasterGrob(
+        img.i,
+        width = unit(1, "npc"),
+        height = unit(1, "npc"),
+        gp = gpar(alpha = 0.8)
+      ),
+      xmin = start.x[i], xmax = start.x[i] + dim(img.i)[2],
+      ymin = start.y[i], ymax = start.y[i] + dim(img.i)[1]
     )
 }
 
-pic.list[["PCW9"]] | pic.list[["PCW12_early"]] | pic.list[["PCW12_late"]] |
-  pic.list[["PCW14"]] | pic.list[["PCW16"]] | pic.list[["PCW17"]]
-
-ggsave(
-  filename = "outputs/Visualization/fig-S4b.pdf",
-  width = 20, height = 4
-)
-
-# Tangential cell type distribution (Fig. S4c) ####
-meta <- retina.st.filter@meta.data
-meta$tangential <- abs(meta$tangential)
-
-meta.list <- list()
-for (type.i in cell.type.list) {
-  meta.list[[type.i]] <- data.frame(
-    type = rep(type.i, nrow(meta)),
-    num = correct.cell2loction[type.i, rownames(meta)],
-    loc = meta$tangential,
-    sample = meta$sample.name,
-    row.names = rownames(meta)
-  )
-}
-meta.df <- do.call("rbind", meta.list)
-
-pic.list <- list()
-for (sample.i in sample.list) {
-  pic.list[[sample.i]] <- ggplot(meta.df[meta.df$sample == sample.i, ]) +
-    geom_smooth(
-      aes(x = loc, y = num, group = type, color = type),
-      method = "glm", se = FALSE, formula = y ~ poly(x, 3),
-      method.args = list(family = quasibinomial)
-    ) + theme_classic() +
-    scale_color_manual(values = cell.type.colors) +
-    scale_x_continuous(
-      breaks = c(0, 45, 90, 135),
-      labels = c("0°", "45°", "90°", "135°")
+merge.spatial.plot <- function(gene.symbol) {
+  merge.coo$exp <- merge.obj@assays$Spatial@data[gene.symbol, rownames(merge.coo)]
+  merge.coo$exp[merge.coo$exp > quantile(merge.coo$exp, 0.95)] <- quantile(merge.coo$exp, 0.95)
+  pic.co <- pic +
+    geom_point(data = merge.coo, aes(x = coord.x, y = coord.y, color = exp), size = 0.25, shape = 16) +
+    scale_color_viridis(gene.symbol, option = "B") +
+    coord_fixed(
+      xlim = c(0, start.x[10] + dim(merge.img.list[[10]])[2]),
+      ylim = c(0, max.y), expand = FALSE
     ) +
-    scale_y_continuous(
-      breaks = seq(0, 10) / 10,
-      labels = seq(0, 10) * 10
-    ) +
-    coord_cartesian(ylim = c(0, 0.4)) +
-    geom_vline(xintercept = c(45, 90), linetype = 3) +
+    theme_bw() +
     theme(
-      legend.position = "none",
-      panel.grid = element_blank(),
+      axis.text = element_blank(),
+      axis.ticks = element_blank(),
       axis.title = element_blank(),
-      axis.line = element_line(linewidth = 0.1),
-      axis.text = element_text(color = "black")
+      panel.grid = element_blank(),
+      panel.border = element_blank(),
+      panel.background = element_blank(),
+      panel.spacing = element_blank()
     )
+  pic.co
 }
 
-pic.list[["PCW9"]] | pic.list[["PCW12_early"]] | pic.list[["PCW12_late"]] |
-  pic.list[["PCW14"]] | pic.list[["PCW16"]] | pic.list[["PCW17"]]
+plot.list <- list()
+for (gene.i in co.pair$gene) {
+  plot.list[[gene.i]] <- merge.spatial.plot(gene.i)
+}
+
+plot.list[[1]] /
+  plot.list[[2]] /
+  plot.list[[3]] /
+  plot.list[[4]] /
+  plot.list[[5]] /
+  plot.list[[6]] /
+  plot.list[[7]]
 
 ggsave(
-  filename = "outputs/Visualization/fig-S4c.pdf",
-  width = 20, height = 4
+  "outputs/Visualization/fig-S4b.pdf",
+  width = 15, height = 10
 )

@@ -35,7 +35,39 @@ for (slice.i in slice.list) {
   )
 }
 
-# Tangential annotation (Fig. S2b) ####
+# Number of spots assigned to each layer for each sample (Fig. S2b) ####
+plot.data <- data.frame(
+  sample = retina.st.domain$sample.name,
+  radial = retina.st.domain$radial
+)
+plot.data <- data.frame(table(plot.data))
+plot.data$radial <- factor(plot.data$radial, levels = radial.list)
+plot.data$sample <- factor(plot.data$sample, levels = sample.list)
+
+ggplot(plot.data) +
+  geom_bar(
+    aes(x = sample, y = Freq, group = radial, fill = radial),
+    stat = "identity", position = "dodge"
+  ) +
+  geom_text(
+    aes(x = sample, y = Freq + 3, label = Freq, group = radial),
+    position = position_dodge(width = 0.9),
+    vjust = 0.5, angle = 0, size = 3
+  ) +
+  scale_fill_manual(values = radial.colors) +
+  theme_bw() +
+  ylab("Number of spots") +
+  theme(
+    axis.text = element_text(color = "black"),
+    axis.title.x = element_blank()
+  )
+
+ggsave(
+  "outputs/Visualization/fig-S2b.pdf",
+  width = 15, height = 4
+)
+
+# Tangential annotation (Fig. S2c) ####
 for (slice.i in slice.list) {
   obj <- subset(
     retina.st.domain,
@@ -50,12 +82,12 @@ for (slice.i in slice.list) {
     NoLegend()
 
   ggsave(
-    paste0("outputs/Visualization/fig-S2b_", slice.i, ".pdf"),
+    paste0("outputs/Visualization/fig-S2c_", slice.i, ".pdf"),
     width = 2, height = 2
   )
 }
 
-# UMAP colored by radial sublayer, tangential angle & timeline (Fig. S2c) ####
+# UMAP colored by radial sublayer, tangential angle & timeline (Fig. S2d) ####
 umap.data <- data.frame(
   UMAP_1 = retina.st.domain@reductions$umap@cell.embeddings[, 1],
   UMAP_2 = retina.st.domain@reductions$umap@cell.embeddings[, 2],
@@ -117,6 +149,6 @@ pic.sample <- ggplot(umap.data) +
 (pic.radial | pic.tangential | pic.sample) + plot_layout(widths = c(1, 1, 1))
 
 ggsave(
-  "outputs/Visualization/fig-S2c.pdf",
+  "outputs/Visualization/fig-S2d.pdf",
   width = 15, height = 5
 )

@@ -62,9 +62,9 @@ corr.mat <- corr.mat[c(8, 1:7), 6:1]
 
 bk <- c(seq(-3, -0.01, by = 0.01), seq(0, 3, by = 0.01))
 pheatmap(
-  t(corr.mat), scale = "row",
+  t(corr.mat), scale = "none",
   cluster_cols = FALSE, cluster_rows = FALSE,
-  breaks = bk, angle_col = "45", fontsize = 20,
+  angle_col = "45", fontsize = 20,
   color = c(
     colorRampPalette(colors = c("#5D94A4", "white"))(length(bk) / 2),
     colorRampPalette(colors = c("white", "#DA3B46"))(length(bk) / 2)
